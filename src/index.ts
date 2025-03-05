@@ -26,36 +26,36 @@ console.log(secretPath)
 const bot = new Telegraf<MyContext>(process.env.bot || '')
 console.log(bot)
 // Функция для установки вебхука
-// const setWebhook = async (url: string) => {
-//     try {
-//         // await bot.telegram.deleteWebhook();
-//         await bot.telegram.setWebhook(`${url}${secretPath}`)
-//         console.log(`Webhook установлен: ${url}${secretPath}`)
-//         // const info = await bot.telegram.getWebhookInfo()
-//         // console.log(info)
-//     } catch (error) {
-//         console.error('Ошибка при установке вебхука:', error)
-//     }
-// }
+const setWebhook = async (url: string) => {
+    try {
+        await bot.telegram.deleteWebhook();
+        await bot.telegram.setWebhook(`${url}${secretPath}`)
+        console.log(`Webhook установлен: ${url}${secretPath}`)
+        // const info = await bot.telegram.getWebhookInfo()
+        // console.log(info)
+    } catch (error) {
+        console.error('Ошибка при установке вебхука:', error)
+    }
+}
 
 // Конфигурация для разных режимов
-// if (mode === 'development') {
-//     const fetchNgrokUrl = async () => {
-//         try {
-//             const res = await fetch('http://127.0.0.1:4040/api/tunnels')
-//             const json: any = await res.json()
-//             const secureTunnel = json.tunnels[0].public_url
-//             console.log(`Ngrok URL: ${secureTunnel}`)
-//             await setWebhook(secureTunnel)
-//         } catch (error) {
-//             console.error('Ошибка при получении URL из ngrok:', error)
-//         }
-//     }
-//     fetchNgrokUrl()
-// } else if (mode === 'production') {
-//     const siteUrl = process.env.site_url || 'https://example.com'
-//     setWebhook(`${siteUrl}`)
-// }
+if (mode === 'development') {
+    const fetchNgrokUrl = async () => {
+        try {
+            const res = await fetch('http://127.0.0.1:4040/api/tunnels')
+            const json: any = await res.json()
+            const secureTunnel = json.tunnels[0].public_url
+            console.log(`Ngrok URL: ${secureTunnel}`)
+            await setWebhook(secureTunnel)
+        } catch (error) {
+            console.error('Ошибка при получении URL из ngrok:', error)
+        }
+    }
+    fetchNgrokUrl()
+} else if (mode === 'production') {
+    const siteUrl = process.env.site_url || 'https://example.com'
+    setWebhook(`${siteUrl}`)
+}
 
 // Middleware для обработки запросов от Telegram
 app.use(express.json())
@@ -184,7 +184,7 @@ bot.start(async (ctx: MyContext) => {
         const userId = ctx.from?.id
         if (!userId) throw Error
         // logger.info(`${userId} Запускает бота`)
-
+        console.log("start")
         const userStatus = await fetchUser(userId)
         // console.log(userStatus)
         if (userStatus.is_exists) {
