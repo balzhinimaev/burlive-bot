@@ -22,13 +22,11 @@ app.use(morgan('dev'))
 const port = process.env.PORT || 3000
 const mode = process.env.mode || 'development'
 const secretPath = `/${process.env.secret_path}` || ''
-console.log(secretPath)
 const bot = new Telegraf<MyContext>(process.env.bot || '')
-console.log(bot)
 // Функция для установки вебхука
 const setWebhook = async (url: string) => {
     try {
-        await bot.telegram.deleteWebhook();
+        await bot.telegram.deleteWebhook()
         await bot.telegram.setWebhook(`${url}${secretPath}`)
         console.log(`Webhook установлен: ${url}${secretPath}`)
         // const info = await bot.telegram.getWebhookInfo()
@@ -59,7 +57,7 @@ if (mode === 'development') {
 
 // Middleware для обработки запросов от Telegram
 app.use(express.json())
-app.use("/hello", async (req, res) => {
+app.use('/hello', async (req, res) => {
     res.status(200).json({ message: 'hello' })
     return
 })
@@ -93,12 +91,12 @@ app.get(`/success/:user_id`, async (req, res) => {
 const homeScene = new Scenes.BaseScene<MyContext>('home')
 const homeKeyboard = Markup.inlineKeyboard([
     [
-        Markup.button.webApp('Самоучитель', 'https://burlive.ru'), // Замените на URL вашего веб-приложения
-        Markup.button.callback('Словарь', 'dictionary-wizard'),
+        Markup.button.webApp('🚀 Самоучитель', 'https://burlive.ru'), // Замените на URL вашего веб-приложения
+        Markup.button.callback('📘 Словарь', 'dictionary-wizard'),
     ],
-    [Markup.button.callback('Предложения', 'sentences')],
-    [Markup.button.callback('Премиум доступ', 'subcribe')],
-    [Markup.button.callback('Личный кабинет', 'dashboard-wizard')],
+    [Markup.button.callback('📝 Предложения', 'sentences')],
+    [Markup.button.callback('💎 Премиум доступ', 'subcribe')],
+    [Markup.button.callback('👤 Личный кабинет', 'dashboard-wizard')],
 ])
 const homeGreetingMessage = `<b>Самоучитель бурятского языка</b>\n\nКаждое взаимодействие с ботом влияет на сохранение и дальнейшее развитие Бурятского языка\n\nВыберите раздел, чтобы приступить`
 homeScene.enter((ctx) => {
@@ -183,8 +181,17 @@ bot.start(async (ctx: MyContext) => {
     try {
         const userId = ctx.from?.id
         if (!userId) throw Error
-        // logger.info(`${userId} Запускает бота`)
-        console.log("start")
+
+        let referralCode: any
+        if (ctx.startPayload) {
+            const startParameter = ctx.startPayload
+            if (startParameter && startParameter.startsWith('ref_')) {
+                referralCode = startParameter.substring(4) // Remove 'ref_' prefix
+            }
+        }
+
+        console.log(referralCode)
+
         const userStatus = await fetchUser(userId)
         // console.log(userStatus)
         if (userStatus.is_exists) {
@@ -192,6 +199,89 @@ bot.start(async (ctx: MyContext) => {
         } else {
             const request = await createUser(
                 userId,
+                ctx.from.first_name,
+                referralCode,
+                ctx.from.last_name,
+                ctx.from.username,
+            )
+            let welcomeMessage: string =
+                '<b>Привет!</b> Добро пожаловать в наш языковой бот, где обучение – это игра:\n'
+            welcomeMessage += '\n'
+            welcomeMessage += '• <b>Самоучитель:</b> Учись легко и без скуки.\n'
+            welcomeMessage +=
+                '• <b>Языковой корпус &amp; словарь:</b> Добавляй крутые примеры, ищи переводы в пару кликов.\n'
+            welcomeMessage +=
+                '• <b>Голосование, рейтинги &amp; конкурсы:</b> Твое мнение решает, а активность вознаграждается!\n'
+            welcomeMessage += '\n'
+            welcomeMessage +=
+                'Готов прокачать навыки и создавать контент? Поехали!\n\n'
+            welcomeMessage += `Этот проект все еще на стадии доработки, как закончим, мы вам напишем! Пожалуйста, не блокируйте бота.`
+
+            if (request.user && referralCode) {
+                // Track referral
+                try {
+                    await fetch(
+                        `${process.env.api_url}/telegram/user/track-referral`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                userId,
+                                referralCode,
+                            }),
+                        }
+                    )
+                } catch (error) {
+                    logger.error(`Error tracking referral: ${error}`)
+                }
+            }
+            
+            if (request.user) {
+                logger.info(`Пользователь ${userId} зарегистрирован!`)
+                await ctx.reply(welcomeMessage, {
+                    parse_mode: 'HTML',
+                    reply_markup: { remove_keyboard: true },
+                })
+                ctx.scene.enter('home')
+            } else {
+                throw Error
+            }
+        }
+    } catch (error) {
+        logger.error(`Ошибка`)
+        const message = `Произошла ошибка, попробуйте позже, или свяжитесь @frntdev или введите /start`
+        await sendOrEditMessage(
+            ctx,
+            message,
+            Markup.inlineKeyboard([[Markup.button.callback('Назад', 'back')]])
+        )
+    }
+})
+homeScene.start(async (ctx: MyContext) => {
+    try {
+        const userId = ctx.from?.id
+        if (!userId) throw Error
+
+        let referralCode: any
+        if (ctx.startPayload) {
+            const startParameter = ctx.startPayload
+            if (startParameter && startParameter.startsWith('ref_')) {
+                referralCode = startParameter.substring(4) // Remove 'ref_' prefix
+            }
+        }
+
+        console.log(referralCode)
+
+        const userStatus = await fetchUser(userId)
+        // console.log(userStatus)
+        if (userStatus.is_exists) {
+            ctx.scene.enter('home')
+        } else {
+            const request = await createUser(
+                userId,
+                referralCode,
                 ctx.from.first_name,
                 ctx.from.last_name,
                 ctx.from.username
@@ -208,6 +298,27 @@ bot.start(async (ctx: MyContext) => {
             welcomeMessage +=
                 'Готов прокачать навыки и создавать контент? Поехали!\n\n'
             welcomeMessage += `Этот проект все еще на стадии доработки, как закончим, мы вам напишем! Пожалуйста, не блокируйте бота.`
+
+            if (request.user && referralCode) {
+                // Track referral
+                try {
+                    await fetch(
+                        `${process.env.api_url}/telegram/user/track-referral`,
+                        {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                userId,
+                                referralCode,
+                            }),
+                        }
+                    )
+                } catch (error) {
+                    logger.error(`Error tracking referral: ${error}`)
+                }
+            }
 
             if (request.user) {
                 logger.info(`Пользователь ${userId} зарегистрирован!`)
@@ -247,6 +358,6 @@ bot.action(/^.*$/, async (ctx) => {
 })
 
 // bot.on('message', async (ctx) => {
-    // console.log(ctx.update.message)
-    // ctx.telegram.sendSticker()
+// console.log(ctx.update.message)
+// ctx.telegram.sendSticker()
 // })

@@ -4,6 +4,7 @@ import { TelegramUser } from "../types/User";
 export const createUser = async (
     id: number,
     first_name: string,
+    referralCode?: string,
     last_name?: string,
     username?: string
 ): Promise<{ message: string; user: number }> => {
@@ -20,6 +21,7 @@ export const createUser = async (
                 first_name,
                 last_name,
                 username,
+                referral: referralCode,
             }),
         }
     )

@@ -13,7 +13,7 @@ export const fetchUserReferralInfo = async (
 ): Promise<MyResponse> => {
     try {
         const response = await fetch(
-            `${process.env.api_url}/api/telegram/user/referral/${userId}`,
+            `${process.env.api_url}/telegram/user/referral/${userId}`,
             {
                 method: 'GET',
                 headers: {
@@ -22,7 +22,6 @@ export const fetchUserReferralInfo = async (
                 },
             }
         )
-        logger.info(`Запрос реферального кода`)
         if (!response.ok) {
             throw new Error('Failed to fetch user referral info')
         }

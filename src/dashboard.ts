@@ -4,6 +4,7 @@ import sendOrEditMessage from './utils/sendOrEditMessage'
 import { fetchUser } from './utils/fetchUser'
 import { savePhoneNumber } from './utils/savePhoneNumber'
 import logger from './utils/logger'
+import { fetchUserReferralInfo } from './utils/fetchUserReferralInfo'
 
 // Клавиатура с кнопками подписки
 const dashboardButtons = Markup.inlineKeyboard([
@@ -30,6 +31,17 @@ const referralButtons = Markup.inlineKeyboard([
 const aboutButtons = Markup.inlineKeyboard([
     [
         Markup.button.callback('Назад', 'back-to-dashboard'),
+        Markup.button.url('Обратная связь', 'https://t.me/frntdev'), // Ссылка на обратную связь
+    ],
+])
+// Клавиатура с кнопками для секции Вывод средств
+const withdrawButtons = Markup.inlineKeyboard([
+    [{ text: "по системе быстрых платежей", callback_data: "withdraw_to_spb" }],
+    [{ text: "по номеру карты", callback_data: "withdraw_to_cart" }],
+    [{ text: "telegram stars", callback_data: "withdraw_to_stars" }],
+    [{ text: "кошелек TON", callback_data: "withdraw_to_ton" }],
+    [
+        Markup.button.callback('Назад', 'back-to-refferal'),
         Markup.button.url('Обратная связь', 'https://t.me/frntdev'), // Ссылка на обратную связь
     ],
 ])
@@ -68,21 +80,45 @@ async function generateAboutSection(ctx: MyContext) {
     let message = `<b>О проекте</b>\n\n`
     message += `Этот языковой бот создан, чтобы сделать изучение Бурятского простым, увлекательным и эффективным.`
     message += `\n\nЗдесь тебя ждут: \n<i>— интерактивный самоучитель, \n— расширяемый языковой корпус, \n— удобный словарь, \n — голосования за материалы, \n — интересные конкурсы.</i> \n\n`
-    message += `<i>p.s. 21.02.2025 Проект на стадии разработки. Бот будет работать некорректно. Просим не блокировать бота.</i>\n@bur_live`
+    message += `<i>p.s. 06.03.2025 Проект на стадии разработки. Бот будет работать некорректно. Просим не блокировать бота.</i>\n@bur_live`
     await sendOrEditMessage(ctx, message, aboutButtons)
     ctx.wizard.selectStep(2)
-}   
-stepHandler.action(`refferal`, async (ctx) => {
+}
+async function generateWithdrawSection(ctx: MyContext) {
+    let message = `<b>Вывод средств</b>\n\n`
+    message += `Выберите метод вывода средств\n`
+    await sendOrEditMessage(ctx, message, withdrawButtons)
+    ctx.wizard.selectStep(3)
+}
+
+async function generateRefferalSection(ctx: MyContext) {
+    const userId = ctx.from?.id
+    if (!userId) throw Error
+
+    const referralInfo = await fetchUserReferralInfo(userId)
+
     let message = `<b>💰 Реферальная программа</b>\n\n`
     message += `Приглашай и зарабатывай бонусы!\n`
     message += `Стань частью нашей реферальной программы и получай вознаграждения за каждого друга, который зарегистрируется и оформит подписку.\n\n`
-    message += `Баланс: 850 руб.\n`
-    message += `Привлечено пользователей: 712\n`
-    message += `Оформили подписки: 35\n`
-    message += `Конверсия: 5%`
+    message += `<b>Твоя реферальная ссылка:</b>\n<code>${referralInfo.referralLink}</code>\n\n`
+    message += `<b>Ваш уровень: 174.5 руб за каждого платного подписчика</b>\n`
+    message += `<b>Баланс:</b> ${referralInfo.earnedBonus} руб.\n`
+    message += `<b>Привлечено пользователей:</b> ${referralInfo.referralsCount}\n`
+    message += `<b>Оформили подписки:</b> ${referralInfo.subscribedReferralsCount}\n`
+    message += `<b>Конверсия:</b> ${
+        referralInfo.referralsCount > 0
+            ? Math.round(
+                  (referralInfo.subscribedReferralsCount /
+                      referralInfo.referralsCount) *
+                      100
+              )
+            : 0
+    }%`
+
     await sendOrEditMessage(ctx, message, referralButtons)
     ctx.wizard.selectStep(1)
-})
+}
+stepHandler.action(`refferal`, async (ctx) => await generateRefferalSection(ctx))
 
 // stepHandler.action(/^.*$/, async (ctx: MyContext) => {
 //     ctx.wizard.selectStep(2)
@@ -112,6 +148,14 @@ const dashboardWizard = new Scenes.WizardScene(
                 ctx.wizard.selectStep(0)
                 await dashboardGreeting(ctx)
             }
+
+            if (data === 'withdraw') {
+                await generateWithdrawSection(ctx)
+            }
+
+            if (data === 'stats') {
+                ctx.answerCbQuery()
+            }
         }
     },
 
@@ -127,6 +171,21 @@ const dashboardWizard = new Scenes.WizardScene(
             }
 
             ctx.answerCbQuery()
+        }
+    },
+    
+    async (ctx: MyContext) => {
+        if (ctx.updateType === "message") {
+            await generateWithdrawSection(ctx)
+        } else if (ctx.updateType === 'callback_query') {
+            const data: 'back-to-refferal' = ctx.update.callback_query.data
+
+            if (data === 'back-to-refferal') {
+                return await generateRefferalSection(ctx)
+            }
+
+            ctx.answerCbQuery()
+
         }
     }
 )

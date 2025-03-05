@@ -10,6 +10,7 @@ interface MyWizardSession extends Scenes.WizardSessionData {
 // Интерфейс контекста
 export interface MyContext extends Context {
     update: any;
+    startPayload: string | null;
     myContextProp: any;
     currentScene: string;
     scene: Scenes.SceneContextScene<MyContext, MyWizardSession>
