@@ -657,7 +657,7 @@ dictionaryWizard.use(async (ctx, next) => {
 
                         const fetchuserResult =
                             (await getuser.json()) as getUserResponse
-                        console.log(fetchuserResult)
+
                         // Подготовка тела запроса
                         const requestBody = {
                             word_id: wordId,
@@ -669,7 +669,7 @@ dictionaryWizard.use(async (ctx, next) => {
                                 translation.trim().toLowerCase() || '',
                             telegram_user_id: fetchuserResult.user.id,
                         }
-                        console.log(requestBody)
+
                         const response = await fetch(
                             `${apiUrl}/vocabulary/suggest-translate`,
                             {
