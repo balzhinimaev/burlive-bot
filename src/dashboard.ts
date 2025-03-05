@@ -91,7 +91,7 @@ async function generateWithdrawSection(ctx: MyContext) {
     ctx.wizard.selectStep(3)
 }
 
-async function generateRefferalSection(ctx: MyContext) {
+export async function generateRefferalSection(ctx: MyContext) {
     const userId = ctx.from?.id
     if (!userId) throw Error
 
