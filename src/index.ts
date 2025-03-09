@@ -103,7 +103,7 @@ const homeKeyboard = Markup.inlineKeyboard([
         Markup.button.webApp('🚀 Самоучитель', webapp_url), // Замените на URL вашего веб-приложения
         Markup.button.callback('📘 Словарь', 'dictionary-wizard'),
     ],
-    [Markup.button.callback('📝 Предложения', 'sentences')],
+    [Markup.button.webApp('🏆 Лидерборд', 'https://anoname.xyz/leaderboard')],
     [Markup.button.callback('💎 Премиум доступ', 'subcribe')],
     [Markup.button.callback('👤 Личный кабинет', 'dashboard-wizard')],
 ])
