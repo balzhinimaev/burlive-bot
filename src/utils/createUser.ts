@@ -6,7 +6,8 @@ export const createUser = async (
     first_name: string,
     referralCode?: string,
     last_name?: string,
-    username?: string
+    username?: string,
+    botusername?: string
 ): Promise<{ message: string; user: number }> => {
     const response = await fetch(
         `${process.env.api_url}/telegram/create-user`,
@@ -22,6 +23,7 @@ export const createUser = async (
                 last_name,
                 username,
                 referral: referralCode,
+                botusername
             }),
         }
     )

@@ -16,7 +16,7 @@ import { saveAction } from './utils/saveAction'
 import { error } from 'console'
 
 const app = express()
-
+const botusername = process.env.botusername
 app.use(bodyParser.json())
 app.use(morgan('dev'))
 
@@ -214,7 +214,8 @@ bot.start(async (ctx: MyContext) => {
                 ctx.from.first_name,
                 referralCode,
                 ctx.from.last_name,
-                ctx.from.username
+                ctx.from.username,
+                botusername
             )
             let welcomeMessage: string =
                 '<b>Привет!</b> Добро пожаловать в наш языковой бот, где обучение – это игра:\n'
@@ -299,7 +300,8 @@ homeScene.start(async (ctx: MyContext) => {
                 referralCode,
                 ctx.from.first_name,
                 ctx.from.last_name,
-                ctx.from.username
+                ctx.from.username,
+                botusername
             )
             let welcomeMessage: string =
                 '<b>Привет!</b> Добро пожаловать в наш языковой бот, где обучение – это игра:\n'
@@ -394,7 +396,8 @@ bot.action(/^.*$/, async (ctx) => {
             '',
             ctx.from.first_name,
             ctx.from.last_name,
-            ctx.from.username
+            ctx.from.username,
+            botusername
         )
         let welcomeMessage: string =
             '<b>Привет!</b> Добро пожаловать в наш языковой бот, где обучение – это игра:\n'
