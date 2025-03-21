@@ -8,7 +8,7 @@ const logsDir = resolve(__dirname, '..', 'logs')
 
 // Проверка наличия папки logs, иначе создание
 if (!existsSync(logsDir)) {
-    mkdirSync(logsDir)
+    mkdirSync(logsDir, { recursive: true })
 }
 
 // Получение текущей даты в формате для имени файла
@@ -22,43 +22,43 @@ const getDateForFileNameFull = () => {
 
 const getDateForDirNameMonth = () => {
     const now = new Date()
-    const month = String(now.getMonth() + 1).padStart(2, '0')
-    return `${month}`
+    return String(now.getMonth() + 1).padStart(2, '0')
 }
 
 const getDateForDirNameYear = () => {
-    const now = new Date()
-    const year = now.getFullYear()
-    return `${year}`
+    return String(new Date().getFullYear())
 }
 
-// Формат для консоли с человеко-понятным временем по улан-удэнскому времени
-const humanReadableConsoleFormat = winston.format.printf(
-    ({ level, message, timestamp }) => {
+// Форматы логирования
+const consoleFormat = winston.format.combine(
+    winston.format.colorize(),
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    // Вывод временной метки в локальном времени (например, для Ulaanbaatar)
+    winston.format.printf(({ level, message, timestamp }) => {
         const localTime = new Date(timestamp as string).toLocaleString('ru-RU', {
             timeZone: 'Asia/Ulaanbaatar',
         })
         return `${localTime} [${level}]: ${message}`
-    }
+    })
 )
 
-// Создание логгера Winston с настройкой файлов для каждого дня в отдельных папках для каждого месяца
+const fileFormat = winston.format.combine(
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    winston.format.json()
+)
+
+// Создание логгера Winston с DailyRotateFile
 const logger = winston.createLogger({
+    level: 'info',
     transports: [
         new winston.transports.Console({
-            format: winston.format.combine(
-                winston.format.timestamp(),
-                humanReadableConsoleFormat
-            ),
+            format: consoleFormat,
             level: 'info',
         }),
         new winston.transports.File({
             filename: `${logsDir}/combined.log`,
             level: 'info',
-            format: winston.format.combine(
-                winston.format.timestamp(),
-                winston.format.json()
-            ),
+            format: fileFormat,
         }),
         new DailyRotateFile({
             filename: `${logsDir}/${getDateForDirNameYear()}/${getDateForDirNameMonth()}/log-${getDateForFileNameFull()}.log`,
@@ -66,16 +66,22 @@ const logger = winston.createLogger({
             zippedArchive: true,
             maxSize: '20m',
             maxFiles: '14d',
-            format: winston.format.combine(
-                winston.format.timestamp(),
-                winston.format.json()
-            ),
+            format: fileFormat,
         }),
     ],
     format: winston.format.combine(
         winston.format.timestamp(),
         winston.format.json()
     ),
+})
+
+// Функция для добавления контекста запроса к логам
+export const addRequestContext = (req: any) => ({
+    userId: req.userId || 'anonymous',
+    requestId: req.requestId,
+    ip: req.ip,
+    path: req.originalUrl,
+    method: req.method,
 })
 
 export default logger

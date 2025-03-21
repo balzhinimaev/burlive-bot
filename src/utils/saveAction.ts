@@ -1,3 +1,4 @@
+import config from "../config";
 import { TelegramUser } from "../types/User";
 
 // Функция для создания пользователя
@@ -12,17 +13,17 @@ export const saveAction = async (
     }
 
     const request = await fetch(
-        `${process.env.api_url}/telegram/user/save-user-action`,
+        `${config.api.url}/telegram/user/save-user-action`,
         {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${process.env.admintoken}`,
+                Authorization: `Bearer ${config.api.token}`,
             },
             body: JSON.stringify({
                 userId,
                 updateType,
-                data
+                data,
             }),
         }
     )

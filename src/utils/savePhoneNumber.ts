@@ -1,3 +1,4 @@
+import config from "../config";
 import { TelegramUser } from "../types/User";
 
 // Функция для сохранения номера телефона
@@ -6,12 +7,12 @@ export const savePhoneNumber = async (
     phoneNumber: string
 ): Promise<{ message: string; }> => {
     const response = await fetch(
-        `${process.env.api_url}/telegram/user/save-phone`,
+        `${config.api.url}/telegram/user/save-phone`,
         {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${process.env.admintoken}`,
+                Authorization: `Bearer ${config.api.token}`,
             },
             body: JSON.stringify({
                 userId,

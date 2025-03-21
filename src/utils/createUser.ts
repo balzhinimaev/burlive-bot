@@ -1,3 +1,4 @@
+import config from "../config";
 import { TelegramUser } from "../types/User";
 
 // Функция для создания пользователя
@@ -10,12 +11,12 @@ export const createUser = async (
     botusername?: string
 ): Promise<{ message: string; user: number }> => {
     const response = await fetch(
-        `${process.env.api_url}/telegram/create-user`,
+        `${config.api.url}/telegram/create-user`,
         {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${process.env.admintoken}`,
+                Authorization: `Bearer ${config.api.token}`,
             },
             body: JSON.stringify({
                 id,

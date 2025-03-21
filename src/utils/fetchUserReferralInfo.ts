@@ -1,4 +1,5 @@
 import logger from './logger'
+import config from '../config'
 
 interface MyResponse {
     referralCode: string
@@ -13,12 +14,12 @@ export const fetchUserReferralInfo = async (
 ): Promise<MyResponse> => {
     try {
         const response = await fetch(
-            `${process.env.api_url}/telegram/user/referral/${userId}`,
+            `${config.api.url}/telegram/user/referral/${userId}`,
             {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${process.env.admintoken}`,
+                    Authorization: `Bearer ${config.api.token}`,
                 },
             }
         )

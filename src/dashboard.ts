@@ -14,7 +14,7 @@ const dashboardButtons = Markup.inlineKeyboard([
     [Markup.button.callback('💰 Зарабатывайте с нами', 'refferal')],
     [
         Markup.button.callback('Назад', 'back'),
-        Markup.button.url('Обратная связь', 'https://t.me/frntdev'), // Ссылка на обратную связь
+        Markup.button.url('Обратная связь', 'https://t.me/bur_live'), // Ссылка на обратную связь
     ],
 ])
 // Клавиатура с кнопками для рефереров
@@ -24,14 +24,14 @@ const referralButtons = Markup.inlineKeyboard([
     // [Markup.button.callback('💰 Зарабатывайте с нами', 'refferal')],
     [
         Markup.button.callback('Назад', 'back-to-dashboard'),
-        Markup.button.url('Обратная связь', 'https://t.me/frntdev'), // Ссылка на обратную связь
+        Markup.button.url('Обратная связь', 'https://t.me/bur_live'), // Ссылка на обратную связь
     ],
 ])
 // Клавиатура с кнопками для секции О проекте
 const aboutButtons = Markup.inlineKeyboard([
     [
         Markup.button.callback('Назад', 'back-to-dashboard'),
-        Markup.button.url('Обратная связь', 'https://t.me/frntdev'), // Ссылка на обратную связь
+        Markup.button.url('Обратная связь', 'https://t.me/bur_live'), // Ссылка на обратную связь
     ],
 ])
 // Клавиатура с кнопками для секции Вывод средств
@@ -42,7 +42,7 @@ const withdrawButtons = Markup.inlineKeyboard([
     [{ text: "кошелек TON", callback_data: "withdraw_to_ton" }],
     [
         Markup.button.callback('Назад', 'back-to-refferal'),
-        Markup.button.url('Обратная связь', 'https://t.me/frntdev'), // Ссылка на обратную связь
+        Markup.button.url('Обратная связь', 'https://t.me/bur_live'), // Ссылка на обратную связь
     ],
 ])
 

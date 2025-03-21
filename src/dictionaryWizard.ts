@@ -1145,7 +1145,6 @@ async function render_select_language_section(ctx: MyContext, reply?: boolean) {
     }
 }
 dictionaryWizard.action('home', async (ctx) => {
-    console.log(ctx.wizard.state.language)
     ctx.scene.enter('home')
 })
 

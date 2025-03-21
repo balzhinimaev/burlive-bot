@@ -1,3 +1,4 @@
+import config from "../config";
 import { TelegramUser } from "../types/User";
 
 // Функция для оформления подписки пользователя
@@ -5,11 +6,11 @@ export const createSubscribeUrl = async (
     userId: string,
     subscriptionType: 'monthly' | 'quarterly' | 'annual'
 ): Promise<{ confirmation_url: string; payment_id: string, amount: string }> => {
-    const response = await fetch(`${process.env.api_url}/telegram/subscribe`, {
+    const response = await fetch(`${config.api.url}/telegram/subscribe`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.admintoken}`,
+            Authorization: `Bearer ${config.api.token}`,
         },
         body: JSON.stringify({
             userId,
