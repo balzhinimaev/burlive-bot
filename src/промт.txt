@@ -1,0 +1,50 @@
+
+
+Надо после нажатия на модерация пользователем, давать ему три кнопки (русский, бурятский, назад) как мы только реализовали, и закидывать на какой-то шаг визарда что-ли и ждать только action, если другое что-то будет снова отправлять ему экран с тремя кнопками (русский, бурятский, назад), после нажатия "назад", надо возвращать на главный экран словаря, то есть приветственное сообщение "Словаря", Если пользователь выбрал русский или бурятский, опять перекидывать на какой-нибудь закрытый визард шаг
+
+и сделать подобную функцию
+    const page = ctx.session.page || 1 // Инициализируем page если он еще не определён
+    const limit = 10 // Количество элементов на страницу
+   const language = выбранный пользователем язык
+    await fetchWordsOnApproval(ctx, page, limit, language) и делать там fetch с передачей в параметрах выбранного языка
+
+вот код сервера куда мы шлем запрос
+/**
+ * @route   GET /backendapi/vocabulary/approval
+ * @desc    Получение предложенных слов на утверждение с пагинацией (по языку)
+ * @access  Public (или Admin, если доступ должен быть ограничен)
+ * @query   language - Обязательный ('russian' или 'buryat')
+ * @query   page - Опциональный (номер страницы, default 1)
+ * @query   limit - Опциональный (количество на странице, default 10)
+ */
+vocabularyRouter.get(
+    '/approval',
+    authenticateToken,
+    authorizeAdmin,
+    // -------------------------------------------------------
+    [
+        // Валидация для page (остается опциональной)
+        query('page')
+            .optional()
+            .isInt({ min: 1 })
+            .withMessage('page должен быть целым числом больше 0'),
+
+        // Валидация для limit (остается опциональной)
+        query('limit')
+            .optional()
+            .isInt({ min: 1 })
+            .withMessage('limit должен быть целым числом больше 0'),
+
+        query('language') // Проверяем query parameter 'language'
+            .notEmpty()
+            .withMessage('Query параметр language не может быть пустым')
+            .isString()
+            .withMessage('Query параметр language должен быть строкой')
+            .isIn(['russian', 'buryat']) // Проверяем допустимые значения
+            .withMessage(
+                "Query параметр language должен быть 'russian' или 'buryat'",
+            ),
+    ],
+    validate, // Middleware для обработки ошибок валидации
+    vocabularyController.getWordsOnApproval, // Контроллер
+);

@@ -8,7 +8,7 @@ export const fetchUser = async (
         // console.log(config.api.token)
 
         const response = await fetch(
-            `${config.api.url}/telegram/user/is-exists/${id}`,
+            `${config.api.url}/telegram/users/exists/${id}`,
             {
                 method: 'GET',
                 headers: {

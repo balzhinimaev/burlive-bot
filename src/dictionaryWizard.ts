@@ -56,7 +56,7 @@ interface IWordModel {
 
 // Описываем тип для состояния Wizard-сцены
 interface WizardState {
-    language?: string
+    language?: string // target_langauge
     suggestion?: boolean
     selectedWordId?: string // Добавляем свойство для хранения _id выбранного слова
     selectedDialect?: string
@@ -220,7 +220,7 @@ async function fetchWordsOnApproval(
 }
 
 interface ResponseData {
-    message: string
+    burlangdb: string
     burlivedb: any
 }
 
@@ -247,8 +247,10 @@ const dictionaryWizard = new Scenes.WizardScene<
 
                 const requestBody = {
                     userInput: userInput,
-                    target_language: language,
-                    telegram_user_id: ctx.from?.id,
+                    sourceLanguage: language,
+                    targetLanguage:
+                        language === 'russian' ? 'buryat' : 'russian',
+                    telegramUserId: ctx.from?.id,
                 }
 
                 const response = await postRequest(
@@ -259,6 +261,7 @@ const dictionaryWizard = new Scenes.WizardScene<
 
                 if (response.ok) {
                     const result = (await response.json()) as ResponseData
+                    console.log(result)
                     let burlive_translate = ``
                     if (result.burlivedb) {
                         for (let i = 0; i < result.burlivedb.length; i++) {
@@ -269,11 +272,26 @@ const dictionaryWizard = new Scenes.WizardScene<
                             }
                         }
                     }
+
+                    if (result.burlivedb) {
+                        console.log(result.burlivedb.translations)
+                    }
+
                     const message_header = `<b>Словарь — Результат поиска 🔎</b>\n\n`
-                    const message_footer = `<b>burlive</b>: ${burlive_translate}\n<b>burlang api:</b> ${result.message}\n\n<i>Отправьте /exit для выхода в меню, или введите следующее слово для поиска</i>`
-                    await ctx.reply(`${message_header}${message_footer}`, {
-                        parse_mode: 'HTML',
-                    })
+                    const message_footer = `-------------------------\n| <b>burlive</b>: ${burlive_translate}\n`
+
+                    const message_super_footer = `-------------------------\n| <b>burlang api:</b> ${result.burlangdb}\n-------------------------\n\n`
+                    await ctx.reply(
+                        `${message_header}${message_footer}${message_super_footer}`,
+                        {
+                            parse_mode: 'HTML',
+                            reply_markup: {
+                                inline_keyboard: [
+                                    [Markup.button.callback('Назад', 'back')],
+                                ],
+                            },
+                        }
+                    )
                 } else {
                     const errorMsg = await response.text()
                     await ctx.reply(
@@ -407,6 +425,16 @@ const dictionaryWizard = new Scenes.WizardScene<
             }
 
             await ctx.answerCbQuery()
+        }
+    },
+
+    // Шаг 4: Секция история поиска
+    async (ctx) => {
+        if (ctx.callbackQuery && 'data' in ctx.callbackQuery) {
+            const action = ctx.callbackQuery.data
+
+            if (action === 'back') {
+            }
         }
     }
 )
@@ -790,6 +818,11 @@ const dictionaryKeyboard = Markup.inlineKeyboard([
     [Markup.button.callback('Назад', 'home')],
 ])
 
+const historyKeyboard = Markup.inlineKeyboard([
+    [Markup.button.callback('Удалить историю', 'delete_history')],
+    [Markup.button.callback('Назад', 'back_to_dictionary')],
+])
+
 const link = 'https://t.me/bur_live'
 const how_to_use_dict =
     'https://telegra.ph/Kak-vospolzovatsya-slovarem-httpstmeburlive-bot-09-08'
@@ -1137,6 +1170,7 @@ async function render_select_language_section(ctx: MyContext, reply?: boolean) {
                 Markup.button.callback('Русский', 'select_russian'),
                 Markup.button.callback('Бурятский', 'select_buryat'),
             ],
+            [Markup.button.callback('История поиска', 'my_history')],
             [Markup.button.callback('Назад', 'back')],
         ])
         await sendOrEditMessage(ctx, message, keyboard, reply)
@@ -1144,6 +1178,23 @@ async function render_select_language_section(ctx: MyContext, reply?: boolean) {
         console.log(error)
     }
 }
+
+dictionaryWizard.action('my_history', async (ctx) => {
+    const message = `<b>Словарь — История поиска 🔎</b>\n\n`
+    // ${await getHistory(ctx.from.id)}
+    ctx.editMessageText(message, {
+        parse_mode: 'HTML',
+        reply_markup: {
+            inline_keyboard: [
+                [Markup.button.callback('Удалить историю', 'delete_history')],
+                [Markup.button.callback('Назад', 'back')],
+            ],
+        },
+    })
+    ctx.wizard.selectStep(4)
+    ctx.answerCbQuery()
+})
+
 dictionaryWizard.action('home', async (ctx) => {
     ctx.scene.enter('home')
 })
@@ -1152,12 +1203,45 @@ dictionaryWizard.action('back', async (ctx) => {
     ctx.scene.enter('dictionary-wizard')
 })
 
-// Обработчик для кнопки "Добавить переводы"
-dictionaryWizard.action('consider_suggested_words', async (ctx) => {
-    const page = ctx.session.page || 1 // Инициализируем page если он еще не определён
-    const limit = 10 // Количество элементов на страницу
+// Обработчик для кнопки "Модерация"
+dictionaryWizard.action('consider_suggested_words', async (ctx: MyContext) => {
+    const message = `<b>Модерация</b>\nВыберите язык на котором хотите модерировать контент`
 
-    await fetchWordsOnApproval(ctx, page, limit)
+    // Создаем клавиатуру
+    const suggest_words_keyboard = Markup.inlineKeyboard([
+        // Каждый ряд кнопок - это отдельный массив внутри основного массива
+        [Markup.button.callback('Русский', 'words-consider-russian')],
+        [Markup.button.callback('Бурятский', 'words-consider-buryat')],
+        // Кнопка "Назад" на отдельной строке
+        [Markup.button.callback('Назад', 'skip_word')],
+    ])
+
+    try {
+        if (ctx.callbackQuery && ctx.callbackQuery.message) {
+            await ctx.editMessageText(message, {
+                parse_mode: 'HTML',
+                reply_markup: suggest_words_keyboard.reply_markup, // Клавиатура передается в reply_markup
+            })
+            // Важно ответить на callbackQuery, чтобы убрать "часики" с кнопки
+            await ctx.answerCbQuery()
+        } else {
+            // Фоллбэк, если вдруг нет callbackQuery (маловероятно для action)
+            await ctx.reply(message, {
+                parse_mode: 'HTML',
+                reply_markup: suggest_words_keyboard.reply_markup,
+            })
+        }
+    } catch (error) {
+        console.error('Ошибка при отправке сообщения модерации:', error)
+        // Можно отправить сообщение об ошибке пользователю
+        await ctx
+            .reply('Произошла ошибка. Попробуйте позже.')
+            .catch((err) =>
+                console.error('Не удалось отправить сообщение об ошибке:', err)
+            )
+        // Если это сцена, возможно, стоит ее прервать
+        await ctx.scene?.leave()
+    }
 })
 
 // Обработчики для выбора слова по индексу

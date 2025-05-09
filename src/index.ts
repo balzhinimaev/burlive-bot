@@ -23,7 +23,7 @@ import config from './config'
 const app = express()
 app.use(helmet()) // Security headers
 app.use(compression()) // Response compression
-app.use(bodyParser.json())
+// app.use(bodyParser.json())
 app.use(addRequestId) // Add unique request ID
 app.use(morgan('combined'))
 app.use(express.json())
@@ -65,7 +65,10 @@ if (config.env === 'production') {
  * @param referralCode - Optional referral code
  * @returns Promise<boolean> - Success status
  */
-const registerUser = async (ctx: MyContext, referralCode?: string): Promise<boolean> => {
+const registerUser = async (
+    ctx: MyContext,
+    referral?: string
+): Promise<boolean> => {
     try {
         const userId = ctx.from?.id
         if (!userId) throw new Error('User ID not found')
@@ -73,31 +76,35 @@ const registerUser = async (ctx: MyContext, referralCode?: string): Promise<bool
         const request = await createUser(
             userId,
             ctx.from.first_name,
-            referralCode || '',
+            referral || '',
             ctx.from.last_name,
             ctx.from.username,
             config.bot.username
         )
 
         // Welcome message
-        let welcomeMessage: string = '<b>Привет!</b> Добро пожаловать в наш языковой бот, где обучение – это игра:\n\n'
+        let welcomeMessage: string =
+            '<b>Привет!</b> Добро пожаловать в наш языковой бот, где обучение – это игра:\n\n'
         welcomeMessage += '• <b>Самоучитель:</b> Учись легко и без скуки.\n'
-        welcomeMessage += '• <b>Языковой корпус &amp; словарь:</b> Добавляй крутые примеры, ищи переводы в пару кликов.\n'
-        welcomeMessage += '• <b>Голосование, рейтинги &amp; конкурсы:</b> Твое мнение решает, а активность вознаграждается!\n\n'
-        welcomeMessage += 'Готов прокачать навыки и создавать контент? Поехали!\n\n'
-        welcomeMessage += 'Этот проект все еще на стадии доработки, как закончим, мы вам напишем! Пожалуйста, не блокируйте бота.'
+        welcomeMessage +=
+            '• <b>Языковой корпус &amp; словарь:</b> Добавляй крутые примеры, ищи переводы в пару кликов.\n'
+        welcomeMessage +=
+            '• <b>Голосование, рейтинги &amp; конкурсы:</b> Твое мнение решает, а активность вознаграждается!\n\n'
+        welcomeMessage +=
+            'Готов прокачать навыки и создавать контент? Поехали!\n\n'
+        welcomeMessage +=
+            'Этот проект все еще на стадии доработки, как закончим, мы вам напишем! Пожалуйста, не блокируйте бота.'
 
         let refIsExists: boolean = false
 
         // Track referral if provided
-        if (request.user && referralCode) {
+        if (request.user && referral) {
             try {
-
-                logger.info(referralCode)
+                // logger.info(referralCode)
                 await fetch(`${config.api.url}/telegram/user/track-referral`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, referralCode }),
+                    body: JSON.stringify({ userId, referral }),
                 })
             } catch (error) {
                 logger.error(`Error tracking referral: ${error}`)
@@ -109,9 +116,10 @@ const registerUser = async (ctx: MyContext, referralCode?: string): Promise<bool
 
             bot.telegram.sendMessage(
                 config.chats.informator,
-                `Пользователь: <code>${userId}</code> зарегистирован\n` + `Рефералка: ${referralCode ? "<code>" + referralCode + "</code>" : "Отсутствует"}`,
+                `Пользователь: <code>${userId}</code> зарегистирован\n` +
+                    `Рефералка: ${referral ? '<code>' + referral + '</code>' : 'Отсутствует'}`,
                 {
-                    parse_mode: 'HTML'
+                    parse_mode: 'HTML',
                 }
             )
             await ctx.reply(welcomeMessage, {
@@ -136,7 +144,6 @@ const registerUser = async (ctx: MyContext, referralCode?: string): Promise<bool
 const handleUserEntry = async (ctx: MyContext): Promise<void> => {
     try {
         const userId = ctx.from?.id
-        console.log(userId)
         // logger.info(`${userId}`)
         if (!userId) throw new Error('User ID not found')
 
@@ -165,7 +172,8 @@ const handleUserEntry = async (ctx: MyContext): Promise<void> => {
     } catch (error) {
         // console.log(error)
         logger.error(`Entry error: ${error}`)
-        const message = 'Произошла ошибка, попробуйте позже, или свяжитесь @frntdev или введите /start'
+        const message =
+            'Произошла ошибка, попробуйте позже, или свяжитесь @frntdev или введите /start'
         await sendOrEditMessage(
             ctx,
             message,
@@ -174,33 +182,56 @@ const handleUserEntry = async (ctx: MyContext): Promise<void> => {
     }
 }
 
-
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    uptime: process.uptime(),
-    timestamp: Date.now()
-  })
+    res.status(200).json({
+        status: 'ok',
+        uptime: process.uptime(),
+        timestamp: Date.now(),
+    })
+})
+
+app.post('/send_message', async (req, res): Promise<void> => {
+
+    const { source_language, target_language, user, result } = req.body
+
+    const userId = user.id
+
+    try {
+        await bot.telegram.sendMessage(
+            config.chats.vocabulary_logger,
+            `Пользователь: <code>${userId}</code>\n` + `burlangdb: ${result}`,
+            {
+                parse_mode: 'HTML',
+            }
+        )
+        res.status(200).json({ message: "Сообщение отправлено" })
+        return
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ message: "Ошибка при отправке сообщения" })
+    }
+
+    return
 })
 
 // Graceful shutdown handling
 const gracefulShutdown = async () => {
-  logger.info('Received shutdown signal, closing connections...')
-  
-  // Close the bot webhook
-  try {
-    await bot.telegram.deleteWebhook()
-    logger.info('Bot webhook deleted')
-  } catch (error) {
-    logger.error(`Error deleting webhook: ${error}`)
-  }
-  
-  // Close any database connections here
-  // db.close()
-  
-  logger.info('All connections closed, shutting down')
-  process.exit(0)
+    logger.info('Received shutdown signal, closing connections...')
+
+    // Close the bot webhook
+    try {
+        await bot.telegram.deleteWebhook()
+        logger.info('Bot webhook deleted')
+    } catch (error) {
+        logger.error(`Error deleting webhook: ${error}`)
+    }
+
+    // Close any database connections here
+    // db.close()
+
+    logger.info('All connections closed, shutting down')
+    process.exit(0)
 }
 
 // Register shutdown handlers
@@ -263,19 +294,17 @@ const stage = new Scenes.Stage<MyContext>(
         subscribeWizard,
     ],
     {
-        default: "home"
+        default: 'home',
     }
 )
 
 // Использование middleware сессий и сцен
 bot.use(session())
 bot.use(async (ctx, next) => {
-    
     if (ctx.update.channel_post) {
-        console.log(ctx.update.channel_post)
         return
-    } 
-    
+    }
+
     const userId = ctx.from?.id
     // console.log(userId)
     if (!userId) throw Error
@@ -285,29 +314,36 @@ bot.use(async (ctx, next) => {
     let message = ``
     let photo = ``
     let scene = ``
-    if (updateType === 'message') {
-        if (ctx.update.message) {
-            message = ctx.update.message
-            saveAction(userId, updateType, message)
-        }
-    }
+    // if (updateType === 'message') {
+    //     if (ctx.update.message) {
+    //         message = ctx.update.message
+    //         saveAction(userId, updateType, message)
+    //     }
+    // }
 
     if (updateType === 'callback_query') {
-
         try {
             const userStatus = await fetchUser(userId)
             if (!userStatus.is_exists) {
                 await registerUser(ctx)
-                await sendOrEditMessage(ctx, HOME_GREETING_MESSAGE, HOME_KEYBOARD, true)
+                await sendOrEditMessage(
+                    ctx,
+                    HOME_GREETING_MESSAGE,
+                    HOME_KEYBOARD,
+                    true
+                )
                 return
             }
         } catch (error) {
             console.log(error)
-            sendOrEditMessage(ctx, `Произошла ошибка, повторите запрос или отправьте /start`)
+            sendOrEditMessage(
+                ctx,
+                `Произошла ошибка, повторите запрос или отправьте /start`
+            )
             logger.error(error)
             throw Error
         }
-        
+
         const data: 'dashboard-wizard' | 'home-scene' | 'subscribe' =
             ctx.update.callback_query.data
         if (
@@ -317,7 +353,7 @@ bot.use(async (ctx, next) => {
         ) {
             ctx.currentScene = data
         }
-        saveAction(userId, updateType, data)
+        // saveAction(userId, updateType, data)
     }
 
     return next()
@@ -354,44 +390,44 @@ bot.action('dashboard-wizard', async (ctx) => {
     await ctx.scene.enter('dashboard-wizard')
 })
 // Handle other actions (fallback)
-// bot.action(/^.*$/, async (ctx) => {
-//     try {
-//         const userId = ctx.from?.id
-        
-//         if (ctx.from?.is_bot || !userId) {
-//             throw new Error('Invalid user or bot')
-//         }
-        
-//         const userStatus = await fetchUser(userId)
+homeScene.action(/^.*$/, async (ctx) => {
+    try {
+        const userId = ctx.from?.id
 
-//         if (userStatus.is_exists) {
-//             await sendOrEditMessage(ctx, HOME_GREETING_MESSAGE, HOME_KEYBOARD)
-//             ctx.answerCbQuery()
-//             return
-//         } else {
-//             // Clean up old messages
-//             if (ctx.update.callback_query.message?.message_id) {
-//                 for (let i = ctx.update.callback_query.message.message_id; i !== 0; i--) {
-//                     await ctx.deleteMessage(i).catch(error => {
-//                         console.log(`Failed to delete message ${i}: ${error}`)
-//                     })
-//                     logger.info(`Message ${i} deleted`)
-//                 }
-//             }
+        if (ctx.from?.is_bot || !userId) {
+            throw new Error('Invalid user or bot')
+        }
 
-//             const success = await registerUser(ctx)
-//             if (success) {
-//                 await sendOrEditMessage(ctx, HOME_GREETING_MESSAGE, HOME_KEYBOARD, true)
-//             } else {
-//                 logger.error('Error in action handler during user registration')
-//                 throw new Error('Failed to register user')
-//             }
-//         }
-//     } catch (error) {
-//         logger.error(`Action handler error: ${error}`)
-//         await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте снова.')
-//     }
-// })
+        const userStatus = await fetchUser(userId)
+
+        if (userStatus.is_exists) {
+            await sendOrEditMessage(ctx, HOME_GREETING_MESSAGE, HOME_KEYBOARD)
+            ctx.answerCbQuery()
+            return
+        } else {
+            // Clean up old messages
+            if (ctx.update.callback_query.message?.message_id) {
+                for (let i = ctx.update.callback_query.message.message_id; i !== 0; i--) {
+                    await ctx.deleteMessage(i).catch(error => {
+                        console.log(`Failed to delete message ${i}: ${error}`)
+                    })
+                    logger.info(`Message ${i} deleted`)
+                }
+            }
+
+            const success = await registerUser(ctx)
+            if (success) {
+                await sendOrEditMessage(ctx, HOME_GREETING_MESSAGE, HOME_KEYBOARD, true)
+            } else {
+                logger.error('Error in action handler during user registration')
+                throw new Error('Failed to register user')
+            }
+        }
+    } catch (error) {
+        logger.error(`Action handler error: ${error}`)
+        await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте снова.')
+    }
+})
 
 // homeScene.on('message', async (ctx) => {
 // console.log(ctx.update.message)

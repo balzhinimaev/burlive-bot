@@ -18,6 +18,7 @@ const envSchema = Joi.object({
     API_TOKEN: Joi.string().required(),
     LEADERBOARD_LINK: Joi.string().required(),
     INFORMATOR_CHAT: Joi.string().required(),
+    VOCABULARY_LOGGER_CHAT: Joi.string().required(),
     // Add other required environment variables
 }).unknown()
 
@@ -46,6 +47,7 @@ export default {
     },
     chats: {
         informator: envVars.INFORMATOR_CHAT,
+        vocabulary_logger: envVars.VOCABULARY_LOGGER_CHAT,
     },
     leaderboard: {
         url: envVars.LEADERBOARD_LINK,

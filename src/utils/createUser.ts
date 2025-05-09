@@ -11,7 +11,7 @@ export const createUser = async (
     botusername?: string
 ): Promise<{ message: string; user: number }> => {
     const response = await fetch(
-        `${config.api.url}/telegram/create-user`,
+        `${config.api.url}/telegram/users`,
         {
             method: 'POST',
             headers: {
