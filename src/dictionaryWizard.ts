@@ -40,6 +40,12 @@ interface TelegramUser {
     }
 }
 
+interface IWordModelTranslation {
+    _id: string;
+    text: string;
+    normalized_text: string;
+}
+
 interface IWordModel {
     _id: string
     text: string
@@ -47,10 +53,12 @@ interface IWordModel {
     language: string
     author: any
     contributors: string[]
-    translations: any[]
+    translations: IWordModelTranslation[]
     translations_u: any[]
     createdAt: Date
-    dialect: string
+    updatedAt: Date
+    dialect?: string
+    themes?: []
     // Additional fields, if needed
 }
 
@@ -436,7 +444,21 @@ const dictionaryWizard = new Scenes.WizardScene<
             if (action === 'back') {
             }
         }
+    },
+
+    // Шаг 5: Выбор языка для получения слов, которые затем будут переведены
+    async (ctx) => {
+        if (ctx.callbackQuery && 'data' in ctx.callbackQuery) {
+            const action = ctx.callbackQuery.data
+
+            if (action === 'russian' || action === "buryat") {
+                console.log(action)
+            }
+
+            ctx.answerCbQuery()
+        }
     }
+    
 )
 
 interface getConfirmedWordResponse {
@@ -597,7 +619,12 @@ dictionaryWizard.use(async (ctx, next) => {
                     const prevPage = currentPage - 1
 
                     ctx.session.page = prevPage
-                    await fetchPaginatedWords(ctx, prevPage, 10)
+                    if (ctx.session.selected_language) {
+                        await fetchPaginatedWords(ctx, prevPage, 10, ctx.session.selected_language)
+                    } else {
+                        ctx.reply(`Выберите пожалуйста язык, с которого переводить. Похоже сессия истекла.`)
+                        await renderSelectLanguageForSuggestTranslate(ctx, true)
+                    }
                 } else {
                     await ctx.answerCbQuery('Это первая страница.')
                 }
@@ -629,7 +656,22 @@ dictionaryWizard.use(async (ctx, next) => {
                     if (currentPage < totalPages) {
                         const nextPage = currentPage + 1
                         ctx.session.page = nextPage
-                        await fetchPaginatedWords(ctx, nextPage, 10)
+                        if (ctx.session.selected_language) {
+                            await fetchPaginatedWords(
+                                ctx,
+                                nextPage,
+                                10,
+                                ctx.session.selected_language
+                            )
+                        } else {
+                            ctx.reply(
+                                `Выберите пожалуйста язык, с которого переводить. Похоже сессия истекла.`
+                            )
+                            await renderSelectLanguageForSuggestTranslate(
+                                ctx,
+                                true
+                            )
+                        }
                     } else {
                         await ctx.answerCbQuery('Это последняя страница.')
                     }
@@ -673,7 +715,7 @@ dictionaryWizard.use(async (ctx, next) => {
                 if (ctx.from) {
                     if (ctx.from.id) {
                         const getuser = await fetch(
-                            `${apiUrl}/telegram/user/is-exists/${ctx.from.id}`,
+                            `${apiUrl}/telegram/users/exists/${ctx.from.id}`,
                             {
                                 method: 'GET',
                                 headers: {
@@ -794,7 +836,7 @@ dictionaryWizard.use(async (ctx, next) => {
             }
 
             if (callbackData === 'back') {
-                await fetchPaginatedWords(ctx)
+                await renderSelectLanguageForSuggestTranslate(ctx)
             }
 
             ctx.answerCbQuery()
@@ -856,15 +898,29 @@ dictionaryWizard.action('select_buryat', async (ctx) => {
 })
 
 // Обработчик для предложения перевода к словам
-dictionaryWizard.action('suggest_translate', async (ctx) => {
-    // Начальный запрос на получение доступных слов для перевода
-    await fetchPaginatedWords(ctx, 1, 10)
-})
-
+dictionaryWizard.action('suggest_translate', async (ctx) => renderSelectLanguageForSuggestTranslate(ctx))
+async function renderSelectLanguageForSuggestTranslate (ctx: MyContext, reply?: boolean) {
+    let message = 'Выберите язык, с которого хотите переводить'
+    const suggestTranslateKeyboard = Markup.inlineKeyboard([
+        [
+            Markup.button.callback(
+                'Русский',
+                'select_russian_for_suggest_translate'
+            ),
+            Markup.button.callback(
+                'Бурятский',
+                'select_buryat_for_suggest_translate'
+            ),
+        ],
+    ])
+    await sendOrEditMessage(ctx, message, suggestTranslateKeyboard, reply)
+    ctx.wizard.selectStep(5)
+    // await fetchPaginatedWords(ctx, 1, 10)
+}
 interface fetchPaginatedWordsResponse {
     message: string
-    words: IWordModel[]
-    totalWords: number
+    items: IWordModel[]
+    totalItems: number
     currentPage: number
     totalPages: number
 }
@@ -874,12 +930,13 @@ async function fetchPaginatedWords(
     ctx: MyContext,
     page = 1,
     limit = 10,
+    language: "russian" | "buryat",
     reply = false
 ) {
     try {
         const apiUrl = process.env.api_url
         const response = await fetch(
-            `${apiUrl}/vocabulary/paginated?page=${page}&limit=${limit}`,
+            `${apiUrl}/vocabulary/confirmed-words?page=${page}&limit=${limit}&language=${language}`,
             {
                 method: 'GET',
                 headers: {
@@ -891,22 +948,22 @@ async function fetchPaginatedWords(
         const data = (await response.json()) as fetchPaginatedWordsResponse
 
         if (response.ok) {
-            const { words, totalWords } = data
+            const { items, totalItems } = data
 
-            if (totalWords === 0) {
+            if (totalItems === 0) {
                 ctx.answerCbQuery(`Предложенных слов нет`)
                 return
             }
 
             // Формируем сообщение с результатами
             const resultMessage = await createResultMessage(
-                words,
-                totalWords,
+                items,
+                totalItems,
                 page,
                 limit
             )
             // Формируем клавиатуру, используя word._id
-            const selectionButtons: any = words.map(
+            const selectionButtons: any = items.map(
                 (word: IWordModel, index: number) =>
                     Markup.button.callback(
                         `${index + 1}`,

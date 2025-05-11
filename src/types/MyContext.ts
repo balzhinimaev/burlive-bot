@@ -4,6 +4,7 @@ import { Context, Scenes } from 'telegraf'
 interface MyWizardSession extends Scenes.WizardSessionData {
     cursor: number // Обязательное поле для wizard-сцен
     page?: number // Дополнительное поле для хранения текущей страницы
+    selected_language?: "russian" | "buryat"
     // Добавьте любые другие поля, которые могут быть нужны для сессии
 }
 

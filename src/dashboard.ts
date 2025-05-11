@@ -10,7 +10,7 @@ import { fetchUserReferralInfo } from './utils/fetchUserReferralInfo'
 const dashboardButtons = Markup.inlineKeyboard([
     [Markup.button.callback('Информация о проекте', 'about')],
     // [Markup.button.callback("Мои данные", "home")],
-    [Markup.button.callback('Справочные материалы', 'home')],
+    [Markup.button.callback('Справочные материалы', 'reference-materials')],
     [Markup.button.callback('💰 Зарабатывайте с нами', 'refferal')],
     [
         Markup.button.callback('Назад', 'back'),
@@ -74,6 +74,9 @@ stepHandler.action('back', async (ctx) => {
 stepHandler.action(`about`, async (ctx) => {
     await generateAboutSection(ctx)
     ctx.answerCbQuery('about')
+})
+stepHandler.action(`reference-materials`, async (ctx) => {
+    await ctx.answerCbQuery('⚙️ На стадии доработок')
 })
 
 async function generateAboutSection(ctx: MyContext) {
@@ -141,12 +144,20 @@ const dashboardWizard = new Scenes.WizardScene(
             ctx.wizard.selectStep(0)
             await dashboardGreeting(ctx)
         } else if (ctx.updateType === 'callback_query') {
-            const data: 'back-to-dashboard' | 'stats' | 'withdraw' =
-                ctx.update.callback_query.data
+            const data:
+                | 'back-to-dashboard'
+                | 'stats'
+                | 'withdraw'
+                | 'reference-materials' = ctx.update.callback_query.data
 
             if (data === 'back-to-dashboard') {
                 ctx.wizard.selectStep(0)
                 await dashboardGreeting(ctx)
+            }
+
+            if (data === 'reference-materials') {
+                ctx.wizard.selectStep(0)
+                await ctx.answerCbQuery('⚙️ На стадии доработок')
             }
 
             if (data === 'withdraw') {

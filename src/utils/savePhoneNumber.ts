@@ -7,7 +7,7 @@ export const savePhoneNumber = async (
     phoneNumber: string
 ): Promise<{ message: string; }> => {
     const response = await fetch(
-        `${config.api.url}/telegram/user/save-phone`,
+        `${config.api.url}/telegram/users/${userId}/phone`,
         {
             method: 'PUT',
             headers: {

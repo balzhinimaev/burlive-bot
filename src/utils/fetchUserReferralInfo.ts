@@ -14,7 +14,7 @@ export const fetchUserReferralInfo = async (
 ): Promise<MyResponse> => {
     try {
         const response = await fetch(
-            `${config.api.url}/telegram/user/referral/${userId}`,
+            `${config.api.url}/telegram/users/${userId}/referral-info`,
             {
                 method: 'GET',
                 headers: {

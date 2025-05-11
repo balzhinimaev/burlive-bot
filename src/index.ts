@@ -101,7 +101,7 @@ const registerUser = async (
         if (request.user && referral) {
             try {
                 // logger.info(referralCode)
-                await fetch(`${config.api.url}/telegram/user/track-referral`, {
+                await fetch(`${config.api.url}/telegram/users/${userId}/link-referral`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, referral }),
@@ -344,10 +344,9 @@ bot.use(async (ctx, next) => {
             throw Error
         }
 
-        const data: 'dashboard-wizard' | 'home-scene' | 'subscribe' =
+        const data: 'home-scene' | 'subscribe' =
             ctx.update.callback_query.data
         if (
-            data === 'dashboard-wizard' ||
             data === 'subscribe' ||
             data === 'home-scene'
         ) {
@@ -379,15 +378,17 @@ app.listen(config.port, () => {
     )
 })
 
-bot.action('dictionary-wizard', async (ctx) => {
+homeScene.action('dictionary-wizard', async (ctx) => {
     ctx.scene.enter('dictionary-wizard')
-    await ctx.answerCbQuery()
+    return await ctx.answerCbQuery()
 })
-bot.action('subcribe', async (ctx) => {
-    await ctx.scene.enter('subscribe-wizard')
+homeScene.action('subcribe', async (ctx) => {
+    ctx.scene.enter('subscribe-wizard')
+    return await ctx.answerCbQuery()
 })
-bot.action('dashboard-wizard', async (ctx) => {
-    await ctx.scene.enter('dashboard-wizard')
+homeScene.action('dashboard-wizard', async (ctx) => {
+    ctx.scene.enter('dashboard-wizard')
+    return await ctx.answerCbQuery()
 })
 // Handle other actions (fallback)
 homeScene.action(/^.*$/, async (ctx) => {
