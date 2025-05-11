@@ -98,7 +98,7 @@ const registerUser = async (
         let refIsExists: boolean = false
 
         // Track referral if provided
-        if (request.user && referral) {
+        if (request.userId && referral) {
             try {
                 // logger.info(referralCode)
                 await fetch(`${config.api.url}/telegram/users/${userId}/link-referral`, {
@@ -111,7 +111,7 @@ const registerUser = async (
             }
         }
 
-        if (request.user) {
+        if (request.userId) {
             logger.info(`User ${userId} registered!`)
 
             bot.telegram.sendMessage(
