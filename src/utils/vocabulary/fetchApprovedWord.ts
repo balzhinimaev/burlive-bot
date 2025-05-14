@@ -1,5 +1,5 @@
 import config from "../../config";
-import { IWordModel } from "../../types/vocabulary/IWordModel";
+import { IWordModel } from "../../types/IWordModel";
 
 /**
  * @function getWord

@@ -1,7 +1,7 @@
 import { Markup } from "telegraf"
 import { MyContext } from "../../types/MyContext"
 import sendOrEditMessage from "../sendOrEditMessage"
-import { IWordModel } from "../../types/vocabulary/IWordModel"
+import { IWordModel } from "../../types/IWordModel"
 import { createResultMessage } from "./fetchWordsOnApproval"
 
 interface fetchPaginatedWordsResponse {

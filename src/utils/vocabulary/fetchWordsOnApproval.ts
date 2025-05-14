@@ -1,6 +1,6 @@
 import { Markup } from "telegraf"
 import { MyContext } from "../../types/MyContext"
-import { IWordModel } from "../../types/vocabulary/IWordModel"
+import { IWordModel } from "../../types/IWordModel"
 import sendOrEditMessage from "../sendOrEditMessage"
 interface WordsOnApprovalResponse {
     words: IWordModel[]

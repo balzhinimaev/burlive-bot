@@ -1,6 +1,6 @@
 import config from "../../config";
-import { IWordModel } from "../../types/vocabulary/IWordModel";
-import { IWordOnApproval } from "../../types/vocabulary/IWordOnApproval";
+import { IWordModel } from "../../types/IWordModel";
+import { IWordOnApproval } from "../../types/IWordOnApproval";
 
 /**
  * @function fetchApproval
