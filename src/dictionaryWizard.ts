@@ -798,6 +798,7 @@ async function renderWordsConsiderList(id: number, language: string) {
         const totalPages = Math.ceil(data.totalItems / 10)
 
         let message = `<b>Словар — модерация ✍️</b>\n\n`
+        console.log(data.items)
         if (data.items.length === 0) {
             message += '\nНа этой странице нет слов.'
             return {
@@ -835,7 +836,9 @@ async function renderWordsConsiderList(id: number, language: string) {
         if (currentPage.page > 1) {
             paginationButtons.push(Markup.button.callback('⬅️', 'prev_page'))
         }
-        paginationButtons.push(Markup.button.callback('Назад', 'back'))
+        paginationButtons.push(
+            Markup.button.callback('Назад', 'back-to-dictionary')
+        )
         if (currentPage.page < totalPages) {
             paginationButtons.push(Markup.button.callback('➡️', 'next_page'))
         }
@@ -863,10 +866,18 @@ dictionaryWizard.use(async (ctx, next) => {
                 | 'prev_page'
                 | 'back-to-dictionary' = (ctx.callbackQuery as any).data
 
+            if (callbackData.startsWith('select_word_for_consider_')) {
+                // ctx.wizard.state.selectedWordId = callbackData.split('_')[2]
+                // ctx.wizard.selectStep(8)
+                ctx.answerCbQuery('На стадии разработки функционал')
+            }
+
             if (
                 callbackData === 'words-consider-russian' ||
                 callbackData === 'words-consider-buryat'
             ) {
+
+                setPage(ctx.callbackQuery.from.id, 1)
 
                 if (callbackData === 'words-consider-russian') {
                     await setLanguage(ctx.callbackQuery.from.id, 'russian')
