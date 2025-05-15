@@ -17,6 +17,7 @@ import { fetchSuggestedWordById } from './utils/vocabulary/fetchApprovalWord'
 import {
     ISuggestedWordDetails,
     ISuggestedWordDetailsResponse,
+    ITelegramUserPopulated,
 } from './types/apiResponses'
 interface ILevel {
     name: string
@@ -1792,15 +1793,31 @@ function formatSuggestedWordDetails(
     }
 
     message += `<b>Статус:</b> ${wordDetails.status}\n` // 'new', 'pending' и т.д.
-    message += `<b>Автор:</b> ${wordDetails.author.username || wordDetails.author.first_name || `ID ${wordDetails.author.id}`}\n`
-
-    if (wordDetails.contributors && wordDetails.contributors.length > 0) {
-        const contributorNames = wordDetails.contributors
-            .map((c) => c.username || c.first_name || `ID ${c.id}`)
-            .join(', ')
-        message += `<b>Контрибьюторы:</b> ${contributorNames}\n`
+    // --- ИСПРАВЛЕНИЕ ДЛЯ АВТОРА ---
+    if (wordDetails.author && typeof wordDetails.author === 'object') {
+        // Проверяем, что автор не null и это объект
+        message += `<b>Автор:</b> ${wordDetails.author.username || wordDetails.author.first_name || `ID ${wordDetails.author.id}` || 'Неизвестный автор'}\n`
+    } else {
+        message += `<b>Автор:</b> Не указан или удален\n`
     }
 
+    // --- ИСПРАВЛЕНИЕ ДЛЯ КОНТРИБЬЮТОРОВ ---
+    if (wordDetails.contributors && wordDetails.contributors.length > 0) {
+        const contributorNames = wordDetails.contributors
+            .filter((c) => c && typeof c === 'object') // Отфильтровываем null/undefined и не-объекты
+            .map(
+                (c) =>
+                    (c as ITelegramUserPopulated).username ||
+                    (c as ITelegramUserPopulated).first_name ||
+                    `ID ${(c as ITelegramUserPopulated).id}` ||
+                    'Неизвестный контрибьютор'
+            )
+            .join(', ')
+        if (contributorNames) {
+            // Если после фильтрации и маппинга остались имена
+            message += `<b>Контрибьюторы:</b> ${contributorNames}\n`
+        }
+    }
     if (
         wordDetails.pre_translations &&
         wordDetails.pre_translations.length > 0
