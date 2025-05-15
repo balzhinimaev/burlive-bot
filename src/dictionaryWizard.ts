@@ -13,6 +13,11 @@ import { getCurrentPage } from './utils/vocabulary/getPage'
 import { IWordOnApproval } from './types/IWordOnApproval'
 import { setPage } from './utils/vocabulary/setPage'
 import { getLanguage } from './utils/vocabulary/getLanguage'
+import { fetchSuggestedWordById } from './utils/vocabulary/fetchApprovalWord'
+import {
+    ISuggestedWordDetails,
+    ISuggestedWordDetailsResponse,
+} from './types/apiResponses'
 interface ILevel {
     name: string
     icon: string
@@ -666,7 +671,10 @@ dictionaryWizard.use(async (ctx, next) => {
                                     ? 'russian'
                                     : 'buryat', // Язык перевода
                             translationText: translation, // Введенный перевод
-                            targetLanguage: wordId.language === 'russian' ? 'buryat' : 'russian',
+                            targetLanguage:
+                                wordId.language === 'russian'
+                                    ? 'buryat'
+                                    : 'russian',
                             // dialect: ctx.wizard.state.selectedDialect,
                             // normalized_text:
                             // translation.trim().toLowerCase() || '',
@@ -794,7 +802,7 @@ async function renderWordsConsiderList(id: number, language: string) {
         const currentPage = await getCurrentPage(id)
         const limit = 10
         const data = await fetchApproval('', currentPage.page, limit, language)
-        
+
         const totalPages = Math.ceil(data.totalItems / 10)
 
         let message = `<b>Словар — модерация ✍️</b>\n\n`
@@ -852,7 +860,7 @@ async function renderWordsConsiderList(id: number, language: string) {
         }
     } catch (error) {
         return false
-    } 
+    }
 }
 
 // Шаг 7: Обработка действий с выбранным словом
@@ -867,16 +875,87 @@ dictionaryWizard.use(async (ctx, next) => {
                 | 'back-to-dictionary' = (ctx.callbackQuery as any).data
 
             if (callbackData.startsWith('select_word_for_consider_')) {
-                // ctx.wizard.state.selectedWordId = callbackData.split('_')[2]
-                // ctx.wizard.selectStep(8)
-                ctx.answerCbQuery('На стадии разработки функционал')
+                const wordId = callbackData.substring(
+                    'select_word_for_consider_'.length
+                )
+
+                if (!ctx.from?.id) {
+                    await ctx.answerCbQuery(
+                        'Не удалось определить пользователя.'
+                    )
+                    return
+                }
+                const userId = ctx.from.id
+
+                try {
+                    // 1. Устанавливаем слово, которое пользователь будет рассматривать, через API
+                    await setWord(userId, wordId) // Используем вашу функцию
+
+                    // 2. Получаем язык, на котором пользователь модерирует
+                    const languageData = await getLanguage(userId) // Используем вашу функцию
+                    if (!languageData || !languageData.language) {
+                        await ctx.answerCbQuery(
+                            'Не удалось определить язык для модерации.'
+                        )
+                        await renderModerationSection(ctx)
+                        return
+                    }
+                    const language = languageData.language
+
+                    // 3. Получаем детали этого слова для отображения
+                    await ctx.answerCbQuery('Загрузка слова...')
+                    const wordDetailsResponse = await fetchSuggestedWordById(
+                        wordId,
+                        language
+                    ) // Используем вашу API-функцию для деталей
+
+                    if (wordDetailsResponse && wordDetailsResponse.word) {
+                        await renderSuggestedWordForConsiderationScreen(
+                            ctx,
+                            wordDetailsResponse
+                        )
+                        // Перенаправляем пользователя на шаг 8 (шаг модерации)
+                        ctx.wizard.selectStep(8)
+                    } else {
+                        await ctx.editMessageText(
+                            'Не удалось загрузить детали слова. Попробуйте позже.'
+                        )
+                    }
+                } catch (error) {
+                    console.error(
+                        'Ошибка на шаге 7 при выборе слова для рассмотрения:',
+                        error
+                    )
+                    let errorMessage = 'Произошла ошибка при выборе слова.'
+                    if (error instanceof Error)
+                        errorMessage += ` (${error.message})`
+                    await ctx.editMessageText(errorMessage).catch(() => {})
+                    // Можно вернуть к списку
+                    const currentLanguageData = await getLanguage(userId)
+                    const result = await renderWordsConsiderList(
+                        userId,
+                        currentLanguageData?.language || 'russian'
+                    )
+                    if (result && ctx.callbackQuery.message) {
+                        await ctx
+                            .editMessageText(result.message, {
+                                parse_mode: 'HTML',
+                                reply_markup: {
+                                    inline_keyboard: result.selectionKeyboard,
+                                },
+                            })
+                            .catch(() => {
+                                ctx.scene.enter("dictionary-wizard")
+                            })
+                    }
+                }
+                return
             }
 
             if (
                 callbackData === 'words-consider-russian' ||
                 callbackData === 'words-consider-buryat'
             ) {
-
                 setPage(ctx.callbackQuery.from.id, 1)
 
                 if (callbackData === 'words-consider-russian') {
@@ -967,7 +1046,6 @@ dictionaryWizard.use(async (ctx, next) => {
                 })
             }
 
-            
             if (callbackData === 'back-to-dictionary') {
                 await ctx.scene.enter('dictionary-wizard')
             }
@@ -981,6 +1059,130 @@ dictionaryWizard.use(async (ctx, next) => {
     }
 })
 
+// Шаг 8: Обработка действий модерации (Принять/Отклонить)
+dictionaryWizard.use(async (ctx, next) => {
+    if (ctx.wizard.cursor === 8) {
+        if (ctx.callbackQuery && 'data' in ctx.callbackQuery) {
+            const callbackData: string = (ctx.callbackQuery as any).data;
+
+            if (!ctx.from?.id) {
+                await ctx.answerCbQuery('Не удалось определить пользователя.');
+                return;
+            }
+            const userId = ctx.from.id;
+
+            // 1. Получаем ID слова, которое пользователь обрабатывает, с бэкенда
+            let processedWordData;
+            try {
+                processedWordData = await fetchProcessedWord(userId); // Используем вашу функцию
+            } catch (error) {
+                console.error("Ошибка при получении обрабатываемого слова на шаге 8:", error);
+                await ctx.editMessageText("Не удалось получить информацию о слове на рассмотрении. Попробуйте выбрать слово заново.").catch(() => {});
+                await renderModerationSection(ctx); // Возврат к выбору языка модерации
+                ctx.wizard.selectStep(7);
+                return;
+            }
+            
+            if (!processedWordData || !processedWordData.processed_word_id) {
+                await ctx.answerCbQuery('Ошибка: слово для модерации не найдено в вашем текущем состоянии.');
+                await renderModerationSection(ctx);
+                ctx.wizard.selectStep(7);
+                return;
+            }
+
+            const wordIdToModerate = processedWordData.processed_word_id;
+            // Язык слова, который был сохранен вместе с processed_word_id,
+            // или можно снова запросить getLanguage(userId), если это язык модерации, а не слова.
+            // Для API принятия/отклонения обычно нужен язык самого слова.
+            // В вашем fetchProcessedWord возвращается language - это язык самого слова.
+            const wordLanguage = processedWordData.language as 'russian' | 'buryat';
+
+
+            let actionUrl = '';
+            let successMessage = '';
+            let requestBody: any = {
+                suggestedWordId: wordIdToModerate,
+                telegramUserId: userId,
+                language: wordLanguage // Передаем язык самого слова
+            };
+
+            if (callbackData.startsWith('consider_action_accept_')) {
+                actionUrl = `${process.env.api_url}/vocabulary/accept-suggested-word`;
+                successMessage = 'Слово успешно принято! 👍';
+            } else if (callbackData.startsWith('consider_action_decline_')) {
+                actionUrl = `${process.env.api_url}/vocabulary/decline-suggested-word`;
+                successMessage = 'Слово успешно отклонено. 👎';
+                // requestBody.reason = "Причина (если нужна)";
+            } else if (callbackData === 'back_to_consider_list') {
+                // Очищаем "обрабатываемое слово" на бэкенде, если пользователь решил вернуться, не завершив действие
+                // Это опционально, зависит от вашей логики. Если не очищать, он вернется к тому же слову.
+                // Для примера, давайте очистим:
+                try {
+                    // Предположим, у вас есть API для очистки или вы передаете null/пустую строку в setWord
+                    await setWord(userId, ""); // Передаем пустую строку или специальное значение для очистки
+                } catch (clearError) {
+                    console.error("Ошибка при попытке очистить обрабатываемое слово:", clearError);
+                }
+
+                const currentModerationLanguageData = await getLanguage(userId); // Язык, на котором пользователь модерирует
+                const listRenderLang = currentModerationLanguageData?.language || 'russian';
+                const result = await renderWordsConsiderList(userId, listRenderLang);
+                if (result) {
+                    await sendOrEditMessage(ctx, result.message, Markup.inlineKeyboard(result.selectionKeyboard));
+                } else {
+                    await ctx.editMessageText('Не удалось загрузить список слов.');
+                }
+                ctx.wizard.selectStep(7);
+                await ctx.answerCbQuery();
+                return;
+            } else {
+                await ctx.answerCbQuery('Неизвестное действие.');
+                return;
+            }
+
+            if (!actionUrl) { // Должно быть обработано выше, но на всякий случай
+                await ctx.answerCbQuery('Действие не определено.');
+                return;
+            }
+
+            try {
+                await ctx.answerCbQuery('Обработка...');
+                const response = await postRequest(actionUrl, requestBody, process.env.admintoken!);
+
+                if (response.ok) {
+                    await ctx.editMessageText(successMessage);
+                    // После успешного действия, "обрабатываемое слово" на бэкенде должно быть очищено
+                    // либо самим API принятия/отклонения, либо отдельным вызовом setWord(userId, "")
+                    // Если API не очищает, то:
+                    // await setWord(userId, ""); // Очищаем состояние на бэкенде
+
+                    const currentModerationLanguageData = await getLanguage(userId);
+                    const listRenderLang = currentModerationLanguageData?.language || 'russian';
+                    const listResult = await renderWordsConsiderList(userId, listRenderLang);
+                    if (listResult) {
+                        await ctx.reply(listResult.message, {
+                            parse_mode: 'HTML',
+                            reply_markup: { inline_keyboard: listResult.selectionKeyboard }
+                        });
+                    }
+                    ctx.wizard.selectStep(7); // Возвращаемся на шаг списка
+                } else {
+                    const errorData = await response.json().catch(() => ({ message: 'Не удалось разобрать ошибку сервера.' }));
+                    const errorMessage = errorData.message || `Ошибка: ${response.status}.`;
+                    await ctx.editMessageText(`⚠️ ${errorMessage}`);
+                }
+
+            } catch (error) {
+                console.error('Ошибка при модерации слова на шаге 8:', error);
+                await ctx.editMessageText('Произошла серьезная ошибка при модерации.');
+            }
+        } else if (ctx.message) {
+            await ctx.reply('Пожалуйста, используйте кнопки.');
+        }
+    } else {
+        return next();
+    }
+});
 
 const dictionaryKeyboard = Markup.inlineKeyboard([
     [Markup.button.callback('Найти слово', 'select_language')],
@@ -1312,10 +1514,10 @@ dictionaryWizard.action('back', async (ctx) => {
 })
 
 // Обработчик для кнопки "Модерация"
-dictionaryWizard.action(
-    'consider_suggested_words',
-    async (ctx: MyContext) => renderModerationSection(ctx))
-async function renderModerationSection (ctx: MyContext) {
+dictionaryWizard.action('consider_suggested_words', async (ctx: MyContext) =>
+    renderModerationSection(ctx)
+)
+async function renderModerationSection(ctx: MyContext) {
     const message = `<b>Модерация</b>\nВыберите язык на котором хотите модерировать контент`
 
     // Создаем клавиатуру
@@ -1566,6 +1768,95 @@ dictionaryWizard.action('next_page', async (ctx) => {
         return ctx.answerCbQuery(`Ошибка при обработке запроса`)
     }
 })
+
+/**
+ * Форматирует информацию о предложенном слове для отображения пользователю.
+ * @param wordDetails - Детали предложенного слова.
+ * @returns - Строка с отформатированным сообщением.
+ */
+function formatSuggestedWordDetails(
+    wordDetails: ISuggestedWordDetails
+): string {
+    let message = `<b>Слово на рассмотрении 📝</b>\n\n`
+    message += `<b>Слово:</b> ${wordDetails.text}\n`
+    if (
+        wordDetails.normalized_text &&
+        wordDetails.normalized_text !== wordDetails.text
+    ) {
+        message += `<b>Нормализовано:</b> ${wordDetails.normalized_text}\n`
+    }
+    // message += `<b>Язык:</b> ${wordDetails.language === 'russian' ? 'Русский' : 'Бурятский'}\n`;
+
+    if (wordDetails.dialect) {
+        message += `<b>Диалект:</b> ${wordDetails.dialect.name || 'Не указан'}\n` // Предполагаем, что у диалекта есть поле name
+    }
+
+    message += `<b>Статус:</b> ${wordDetails.status}\n` // 'new', 'pending' и т.д.
+    message += `<b>Автор:</b> ${wordDetails.author.username || wordDetails.author.first_name || `ID ${wordDetails.author.id}`}\n`
+
+    if (wordDetails.contributors && wordDetails.contributors.length > 0) {
+        const contributorNames = wordDetails.contributors
+            .map((c) => c.username || c.first_name || `ID ${c.id}`)
+            .join(', ')
+        message += `<b>Контрибьюторы:</b> ${contributorNames}\n`
+    }
+
+    if (
+        wordDetails.pre_translations &&
+        wordDetails.pre_translations.length > 0
+    ) {
+        message += `\n<b>Предварительные переводы/связанные слова:</b>\n`
+        wordDetails.pre_translations.forEach((pt, index) => {
+            message += `  ${index + 1}. ${pt.text}`
+            // Можно добавить больше деталей о pt, если нужно
+            message += `\n`
+        })
+    }
+
+    // Отображение дат в удобочитаемом формате
+    const createdAtDate = new Date(wordDetails.createdAt)
+    message += `<b>Предложено:</b> ${createdAtDate.toLocaleString('ru-RU')}\n`
+
+    if (
+        wordDetails.updatedAt &&
+        wordDetails.updatedAt !== wordDetails.createdAt
+    ) {
+        const updatedAtDate = new Date(wordDetails.updatedAt)
+        message += `<b>Обновлено:</b> ${updatedAtDate.toLocaleString('ru-RU')}\n`
+    }
+
+    return message
+}
+
+/**
+ * Рендерит экран с деталями выбранного слова и кнопками для модерации.
+ * @param ctx - Контекст Telegraf.
+ * @param wordDetailsResponse - Ответ от API с деталями слова.
+ */
+async function renderSuggestedWordForConsiderationScreen(
+    ctx: MyContext,
+    wordDetailsResponse: ISuggestedWordDetailsResponse
+) {
+    const word = wordDetailsResponse.word
+    const messageText = formatSuggestedWordDetails(word)
+
+    const keyboard = Markup.inlineKeyboard([
+        [
+            Markup.button.callback(
+                '✅ Принять',
+                `consider_action_accept_${word._id}`
+            ),
+            Markup.button.callback(
+                '❌ Отклонить',
+                `consider_action_decline_${word._id}`
+            ),
+        ],
+        [Markup.button.callback('⬅️ Назад к списку', 'back_to_consider_list')],
+    ])
+
+    // Используем sendOrEditMessage для обновления существующего сообщения или отправки нового
+    await sendOrEditMessage(ctx, messageText, keyboard)
+}
 
 // async function renderKeyboardDialects(_ctx: MyContext, selectedDialect: string) {
 //   try {

@@ -3,7 +3,7 @@ import config from "../../config";
 // Функция для создания пользователя
 export const getLanguage = async (
     id: number,
-): Promise<{ language: string; }> => {
+): Promise<{ language: 'russian' | 'buryat'; }> => {
     const response = await fetch(
         `${config.api.url}/telegram/users/${id}/language`,
         {
@@ -17,7 +17,7 @@ export const getLanguage = async (
 
     // Приведение типа результата JSON к ожидаемому типу
     const data = (await response.json()) as {
-        language: string
+        language: 'russian' | 'buryat'
     }
     return data
 }
